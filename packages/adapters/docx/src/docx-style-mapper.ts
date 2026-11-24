@@ -27,6 +27,7 @@ import {
   parseWidth,
 } from './utils/parse';
 import { splitQuadShorthand } from './utils/css-shorthands';
+import { markBackgroundMetadataKey } from './utils/mark-background';
 import {
   twipsToEighthsOfPoint,
   twipsToEmus,
@@ -329,7 +330,13 @@ export class DocxStyleMapper {
         if (el.type === 'table') return {};
         // strip “#” and turn CSS names → hex
 
-        if (el.metadata?.tagName === 'mark' && utils.isColor(v)) {
+        // TODO: a fully transparent background, such as `transparent` or
+        // `currentcolor`, becomes black shading, as `colorConversion` falls
+        // back to black. It should write no shading.
+        const isMarkBackground =
+          el.metadata?.tagName === 'mark' ||
+          el.metadata?.[markBackgroundMetadataKey] === true;
+        if (isMarkBackground && utils.isColor(v)) {
           const hex = convert.colorToHex(v);
           const [, , , alpha] = convert.colorToRgb(v);
           const highlightColor = hex
