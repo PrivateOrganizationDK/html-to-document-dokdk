@@ -1,4 +1,5 @@
 node_modules
+dokdk-build/
 dist
 _index.ts
 .DS_Store
