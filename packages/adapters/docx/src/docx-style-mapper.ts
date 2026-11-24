@@ -1,3 +1,4 @@
+import { convert, utils } from '@asamuzakjp/css-color';
 import {
   BorderStyle,
   // Floating image positioning and wrapping enums
@@ -12,6 +13,7 @@ import {
   VerticalPositionAlign,
   VerticalPositionRelativeFrom,
   WidthType,
+  type IRunOptions,
 } from 'docx';
 import {
   colorConversion,
@@ -25,6 +27,7 @@ import {
   parseWidth,
 } from './utils/parse';
 import { splitQuadShorthand } from './utils/css-shorthands';
+import { markBackgroundMetadataKey } from './utils/mark-background';
 import {
   twipsToEighthsOfPoint,
   twipsToEmus,
@@ -32,6 +35,26 @@ import {
 } from './utils/unit-conversion';
 
 type StyleKey = keyof Styles;
+type HighlightColor = NonNullable<IRunOptions['highlight']>;
+
+const HIGHLIGHT_BY_HEX: Record<string, HighlightColor> = {
+  '000000': 'black',
+  '0000FF': 'blue',
+  '00FFFF': 'cyan',
+  '00FF00': 'green',
+  FF00FF: 'magenta',
+  FF0000: 'red',
+  FFFF00: 'yellow',
+  FFFFFF: 'white',
+  '000080': 'darkBlue',
+  '008080': 'darkCyan',
+  '008000': 'darkGreen',
+  '800080': 'darkMagenta',
+  '800000': 'darkRed',
+  '808000': 'darkYellow',
+  '808080': 'darkGray',
+  C0C0C0: 'lightGray',
+};
 
 /** What a style mapping may need beyond the element and its styles. */
 export type StyleMappingContext = {
@@ -306,6 +329,26 @@ export class DocxStyleMapper {
       backgroundColor: (v, el) => {
         if (el.type === 'table') return {};
         // strip “#” and turn CSS names → hex
+
+        // TODO: a fully transparent background, such as `transparent` or
+        // `currentcolor`, becomes black shading, as `colorConversion` falls
+        // back to black. It should write no shading.
+        const isMarkBackground =
+          el.metadata?.tagName === 'mark' ||
+          el.metadata?.[markBackgroundMetadataKey] === true;
+        if (isMarkBackground && utils.isColor(v)) {
+          const hex = convert.colorToHex(v);
+          const [, , , alpha] = convert.colorToRgb(v);
+          const highlightColor = hex
+            ? HIGHLIGHT_BY_HEX[hex.slice(1).toUpperCase()]
+            : undefined;
+          if (alpha === 1 && highlightColor) {
+            return {
+              highlight: highlightColor,
+            } satisfies IRunOptions;
+          }
+        }
+
         const fill = colorConversion(v);
         return {
           shading: {
@@ -313,7 +356,7 @@ export class DocxStyleMapper {
             fill, // e.g. "F9F9F9"
             color: 'auto', // text color fallback
           },
-        };
+        } satisfies IRunOptions;
       },
 
       // Font size

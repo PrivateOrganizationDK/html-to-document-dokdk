@@ -27,6 +27,7 @@ import { ImageConverter } from './inline/image';
 import { ImageBlockConverter } from './block/image';
 import { promiseAllFlat } from '../docx.util';
 import { ListItemConverter } from './block/list-item';
+import { flagMarkBackground } from '../utils/mark-background';
 import {
   getPageContentWidth,
   type PageOptions,
@@ -193,7 +194,7 @@ export class ElementConverter {
 
     return converter.convertElement(
       this.getDependencies(stylesheet),
-      element,
+      flagMarkBackground(element, stylesheet),
       cascadedStyles
     );
   }

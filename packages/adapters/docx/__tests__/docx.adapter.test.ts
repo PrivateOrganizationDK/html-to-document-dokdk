@@ -1103,6 +1103,109 @@ describe('Docx.adapter.convert', () => {
       expect(para['w:r']['w:t']['#text']).toBe('Highlighted text');
     });
 
+    it('should write a mark background as a DOCX highlight', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: rgb(255 255 0)">Marked text</mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']['@_w:val']).toBe('yellow');
+    });
+
+    it('should not write background shading for a matched mark highlight', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: rgb(255 255 0)">Marked text</mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:shd']).toBeUndefined();
+    });
+
+    it('should write a mark background as a DOCX highlight through nested inline elements', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: rgb(255 255 0)"><strong>Marked text</strong></mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']['@_w:val']).toBe('yellow');
+      expect(runProps['w:shd']).toBeUndefined();
+    });
+
+    it('should write a mark background as a DOCX highlight through deeply nested inline elements and links', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: rgb(255 255 0)"><a href="https://example.com"><em><strong>Marked text</strong></em></a></mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:hyperlink']['w:r'][
+          'w:rPr'
+        ];
+
+      expect(runProps['w:highlight']['@_w:val']).toBe('yellow');
+      expect(runProps['w:shd']).toBeUndefined();
+    });
+
+    it('should write the background of an element in a mark that sets its own as shading', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: yellow"><span style="background-color: red">Own</span></mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']).toBeUndefined();
+      expect(runProps['w:shd']['@_w:fill']).toBe('FF0000');
+    });
+
+    it('should not highlight the descendants of an element in a mark that sets its own background', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: yellow"><span style="background-color: red"><strong>Own</strong></span></mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']).toBeUndefined();
+    });
+
+    it('should highlight a mark nested in an element with its own background', async () => {
+      const elements = parser.parse(
+        '<p><mark style="background-color: yellow"><span style="background-color: red"><mark style="background-color: lime">Inner</mark></span></mark></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']['@_w:val']).toBe('green');
+      expect(runProps['w:shd']).toBeUndefined();
+    });
+
+    it('should write the background of an element other than a mark as shading', async () => {
+      const elements = parser.parse(
+        '<p><span style="background-color: yellow">Not marked</span></p>'
+      );
+      const buffer = await adapter.convert(elements);
+      const jsonDocument = await parseDocxDocument(buffer);
+      const runProps =
+        jsonDocument['w:document']['w:body']['w:p']['w:r']['w:rPr'];
+
+      expect(runProps['w:highlight']).toBeUndefined();
+      expect(runProps['w:shd']['@_w:fill']).toBe('FFFF00');
+    });
+
     it('should render custom font size', async () => {
       const elements: DocumentElement[] = [
         {
